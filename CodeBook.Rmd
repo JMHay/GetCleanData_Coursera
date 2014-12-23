@@ -206,4 +206,8 @@ resultSet <- data.frame(row.names=rs_names)
     }
   }
 write.csv(resultSet, 'resultSet.csv')
+<<<<<<< HEAD
 ```
+=======
+```
+>>>>>>> e36ab73fec9ced75297a319dbb6899b85677d4cb
