@@ -1,0 +1,209 @@
+---
+title: "CodeBook"
+output: 
+  html_document:
+    theme: united
+    toc: yes
+---
+
+## Assignment Description, Coursera Getting and Cleaning Data - Course Progject: 
+### Tasks 
+* Merges the training and the test sets to create one data set.  
+* Extracts only the measurements on the mean and standard deviation for each measurement.  
+* Uses descriptive activity names to name the activities in the data set.  
+* Appropriately labels the data set with descriptive variable names.  
+* From the data set in step 4, creates a second, independent tidy data set with the average of each variable for each activity and each subject.  
+
+### Data    
+ https://d396qusza40orc.cloudfront.net/getdata%2Fprojectfiles%2FUCI%20HAR%20Dataset.zip 
+
+
+## My approach  
+ 1. Get the Data  
+ 1.0. Dowload files  
+ 1.1. Read into R  
+ 2. Explore the Data  
+ 2.0. Understand the structure of the data file(s)  
+ 2.1. check for N/A values (blanks)  
+ 2.2. verify unique variable names  
+ 2.3. review profile (specifically are there any outliers)  
+ 3. Shape the Data  
+ 3.0  combine datasets  
+ 3.1  extract only measurements on mean and standard deviation  
+ 3.2  free memory  
+ 4. Analyze the Data  
+
+
+## 1. Get the Data 
+
+### 1.0. Dowload files
+```{r eval=FALSE, echo=TRUE}
+url <- "https://d396qusza40orc.cloudfront.net/getdata%2Fprojectfiles%2FUCI%20HAR%20Dataset.zip"
+destfile <- "UCI_HAR.zip"
+download.file(url, destfile, method='curl')
+```
+
+Create folder, extract the archived files, and write them to the newly created folder:
+```{r eval=FALSE, echo=TRUE}
+unzip(destfile)
+```
+
+Show which files have been extracted:
+```{r eval=TRUE, echo=TRUE}
+files <- list.files("UCI HAR Dataset")
+```
+```{r eval=TRUE, echo=FALSE}
+files
+```
+Note that "test" and "train" are folders.
+ 
+Explore folders:
+```{r eval=TRUE, echo=TRUE}
+testFiles <- list.files("UCI HAR Dataset/test")
+```
+```{r eval=TRUE, echo=FALSE}
+testFiles
+```
+And subfolder:
+```{r eval=TRUE, echo=TRUE}
+testInertialSignalsFiles <- list.files("UCI HAR Dataset/test/Inertial Signals")
+```
+```{r eval=TRUE, echo=FALSE}
+testInertialSignalsFiles
+```
+
+The train folder has a similar structure.
+
+### 1.1. Read into R
+```{r eval=TRUE, echo=TRUE}
+trn_j <- read.table("UCI HAR Dataset/train/subject_train.txt")
+tst_j <- read.table("UCI HAR Dataset/test/subject_test.txt")
+trn <- read.table("UCI HAR Dataset/train/X_train.txt")
+tst <- read.table("UCI HAR Dataset/test/X_test.txt")
+trn_b <- read.table("UCI HAR Dataset/train/y_train.txt")
+tst_b <- read.table("UCI HAR Dataset/test/y_test.txt")
+act_b <- read.table("UCI HAR Dataset/activity_labels.txt")
+feat <- read.table("UCI HAR Dataset/features.txt")
+```
+
+## 2. Explore the Data
+
+### 2.0. Understand the structure of the data file(s)
+```{r eval=TRUE, echo=TRUE}
+# trn[] and tst[] should have similar structures
+if(length(trn_j) == length(tst_j))  exp_length_j = 1 
+if(length(trn) == length(tst))  exp_length = 1 
+if(length(trn_b) == length(tst_b))  exp_length_b = 1 
+if(!exp_length_j || !exp_length || !exp_length_b) warning("Input files are not similar.")
+```
+### 2.1. check for N/A values (blanks)
+```{r eval=TRUE, echo=TRUE}
+if(length(trn_j[is.na(trn_j[ , 1])]) != 0) warning("The file subject_train.txt included blanks")
+if(length(tst_j[is.na(tst_j[ , 1])]) != 0) warning("The file subject_test.txt included blanks")
+if(length(trn[is.na(trn[ , 1])]) != 0) warning("The file X_train.txt included blanks")
+if(length(tst[is.na(tst[ , 1])]) != 0) warning("The file X_train.txt included blanks")
+if(length(trn_b[is.na(trn_b[ , 1])]) != 0) warning("The file y_train.txt included blanks")
+if(length(tst_b[is.na(tst_b[ , 1])]) != 0) warning("The file y_train.txt included blanks")
+```
+
+### 2.2. verify unique variable names
+If they are not unique, append the an index to the name to distinquish it from others.
+```{r eval=TRUE, echo=TRUE}
+trn_names <- names(trn)
+if(length(trn_names) > length(unique(trn_names))) warning("There are duplicate variable names")
+tst_names <- names(tst)
+if(length(tst_names) > length(unique(tst_names))) warning("There are duplicate variable names")
+compare_names <- trn_names != tst_names
+if(length(compare_names[FALSE]) != 0) warning("The column names are not the same in the data sets")
+if(length(act_b[,2]) > length(unique(act_b[,2]))) 
+  {
+    activities <- as.data.frame(paste(act_b[,1], act_b[,2], sep='_'))
+  } else { 
+    activities <- as.data.frame(act_b[,2])
+  }
+if(length(feat[,2]) > length(unique(feat[,2]))) 
+  {
+    var_names <- as.data.frame(paste(feat[,2], feat[,1], sep='_'))
+  } else { 
+    var_names <- as.data.frame(feat[,2])
+  }
+names(var_names) <- c("Variable" )
+```
+
+### 2.3. review profile (specifically are there any outliers)
+```{r eval=TRUE, echo=TRUE}
+outliers <- function(x) {
+  has_outliers = 0
+  qnt_x <- quantile(x)
+  iqr_x <- IQR(x)
+  lower <- qnt_x["25%"] - (iqr_x*1.5)
+  upper <- qnt_x["75%"] + (iqr_x*1.5)
+  if((qnt_x["0%"] < lower) || (qnt_x["100%"] > upper )) has_outliers = 1
+  has_outliers
+}
+```
+
+This may not be critical to this particular analysis, but generally it can be a useful tool if there are issues with the analysis.
+```{r eval=TRUE, echo=TRUE}
+outlier_list <- apply(trn, 2, outliers)
+```
+
+## 3. Shape the Data  
+
+### 3.0. Combine datasets
+```{r eval=TRUE, echo=TRUE}
+trn_tst_j <- rbind(trn_j, tst_j)
+  names(trn_tst_j) <- c("Subject")
+trn_tst_b <-rbind(trn_b, tst_b)
+  names(trn_tst_b) <- c("Activity")
+trn_tst <- rbind(trn, tst)
+  names(trn_tst) <- var_names$Variable
+```
+
+### 3.1 Extract only the measurements on the mean and standard deviation
+```{r eval=TRUE, echo=TRUE}
+library("dplyr", lib.loc="/Library/Frameworks/R.framework/Versions/3.1/Resources/library")
+trn_tst_mean <- select(trn_tst, contains("[Mm]ean|str"))
+trn_tst_sdev <- select(trn_tst, contains("[Ss][Tt][Dd]|str"))
+```
+Create a single data frame with these two and capture names for use later.
+```{r eval=TRUE, echo=TRUE}
+trn_tst_msr <- cbind(trn_tst_mean, trn_tst_sdev)
+msr_names <- names(trn_tst_msr)
+```
+
+Create One Dataset
+```{r eval=TRUE, echo=TRUE}
+trn_tst_all <-cbind(trn_tst_j, trn_tst_b, trn_tst_msr)
+```
+
+### 3.2 Free Memory
+```{r eval=TRUE, echo=TRUE}
+rm(trn_j, tst_j, trn, tst, trn_b, tst_b, act_b, feat)
+rm(trn_tst_j, trn_tst_b, trn_tst_mean, trn_tst_sdev, trn_tst_msr)
+```
+
+## 4. Analyze the Data
+```{r eval=FALSE, echo=TRUE}
+getMeans <- function(Subject, Activity) {
+  is_relevant <- trn_tst_all[,Subject==Subject & Activity==Activity]
+  output <- as.data.frame(apply(trn_tst_all[is_relevant], 2, mean))
+  output[1,] <- Subject
+  if(Activity==1) output[2,] <- 'WALKING'
+  if(Activity==2) output[2,] <- 'WALKING_UPSTAIRS'
+  if(Activity==3) output[2,] <- 'WALKING_DOWNSTAIRS'
+  if(Activity==4) output[2,] <- 'SITTING'
+  if(Activity==5) output[2,] <- 'STANDING'
+  if(Activity==6) output[2,] <- 'LAYING'  
+  names(output) <- c(paste('Subject:', Subject, '_Activity:', output[2,], sep=''))
+  output
+}
+rs_names <- c('Subject', 'Activity', msr_names)
+resultSet <- data.frame(row.names=rs_names)
+  for(Subject in 1:30) {
+    for(Activity in 1:6) {
+      resultSet <- cbind(resultSet, getMeans(Subject, Activity))
+    }
+  }
+write.csv(resultSet, 'resultSet.csv')
+```
